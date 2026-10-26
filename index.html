@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>まいにちの食卓｜夕食献立プランナー</title>
+<link rel="stylesheet" href="style.css"><script src="app.js" defer></script>
+</head>
+<body>
+<header><a class="brand" href="./"><span class="mark">◒</span> まいにちの食卓</a><span class="header-note">おいしく、無理なく、バランスよく。</span></header>
+<main>
+<section class="intro"><div class="eyebrow">YOUR EVERYDAY DINNER PLANNER</div><h1>今日の「何つくろう」を、<br><span>楽しみに変えよう。</span></h1><p>冷蔵庫の食材から、栄養とつくり方のバランスを考えた献立へ。<br class="desktop">あなたの食卓に、ちょうどいい一週間を。</p><div class="intro-tags"><span>◌ 食材を上手に活用</span><span>◌ 主菜・副菜・汁物を提案</span><span>◌ レシピ付き</span></div></section>
+<div class="workspace"><aside><form id="planner" class="panel"><div class="section-number">01 <span>PLAN YOUR MEALS</span></div><h2>献立の条件をえらぶ</h2><label for="ingredients">使いたい食材</label><p class="field-help" id="ingredient-help">カンマ・スペース・改行で区切って入力できます。</p><textarea id="ingredients" rows="3" maxlength="500" aria-describedby="ingredient-help" placeholder="例：鶏肉、キャベツ、にんじん"></textarea><div class="quick-label">よく使う食材を追加</div><div class="chips" id="chips"></div><label for="days">何日分つくりますか？</label><div class="days-field"><input type="range" id="days" min="1" max="7" value="3"><output id="day-count" for="days">3日分</output></div><div class="range-label"><span>1日</span><span>7日</span></div><button class="primary" type="submit">献立をつくる <span>→</span></button><p class="small-note">食材なしでも、おすすめの献立を提案します。</p></form><div class="balance-note"><span>✳</span><div><strong>食卓に、ちいさなバランスを。</strong><p>肉・魚・大豆製品を取り入れて。焼く・煮る・蒸すなど、つくり方にも変化をつけます。</p></div></div></aside>
+<section class="results" aria-label="提案された献立"><div class="results-heading"><div><div class="section-number">02 <span>YOUR DINNER MENU</span></div><h2>これからの夕食</h2></div><span class="pill" id="menu-count">3日分の献立</span></div><div id="summary" class="summary" role="status" aria-live="polite"></div><div id="menus"></div><p class="nutrition-note">※ 栄養バランスは食材の種類をもとにした目安です。栄養計算・アレルギー対応は行っていません。食物アレルギーがある場合は、材料を必ずご確認ください。</p></section></div>
+</main><footer><span class="brand">◒ まいにちの食卓</span><span>毎日のごはんに、少しのゆとりを。</span></footer>
+<dialog id="recipe-dialog" aria-labelledby="recipe-title"><div class="dialog-top"><span class="eyebrow">RECIPE / 2人分</span><button id="close-dialog" class="close" aria-label="レシピを閉じる">×</button></div><div id="recipe-content"></div></dialog>
+</body></html>
