@@ -13,11 +13,11 @@ test('表記揺れを統合し、肉の部位・魚種は別々に保持する',
  assert.notEqual(normalizeIngredient('鶏もも'),normalizeIngredient('鶏むね'));
  assert.equal(normalizeIngredient('ﾎｯｹ'),'ホッケ');
 });
-test('125件の重複しないレシピに必要な情報が揃っている',()=>{
- assert.equal(recipes.length,125);
- assert.equal(new Set(recipes.map(r=>r.name)).size,125);
- assert.equal(new Set(recipes.map(r=>r.id)).size,125);
- assert.equal(new Set(recipes.map(r=>r.steps.join('|'))).size,125);
+test('135件の重複しないレシピに必要な情報が揃っている',()=>{
+ assert.equal(recipes.length,135);
+ assert.equal(new Set(recipes.map(r=>r.name)).size,135);
+ assert.equal(new Set(recipes.map(r=>r.id)).size,135);
+ assert.equal(new Set(recipes.map(r=>r.steps.join('|'))).size,135);
  for(const r of recipes){
   assert.ok(['主菜','副菜','汁物'].includes(r.type),r.name);
   assert.ok(r.servings===2&&r.time>=10&&r.time<=60,r.name);
@@ -83,4 +83,16 @@ test('1〜7日分の3品構成と調理法・たんぱく源の変化を維持�
 });
 test('日数の範囲外を受け付けない',()=>{
  for(const d of [0,8,-1,1.5,NaN,'7'])assert.throws(()=>createPlan([],d),RangeError);
+});
+
+test('豆苗は自由入力・一覧に対応し、主菜・副菜・汁物に10品ある',()=>{
+ assert.ok(ingredientCatalog['野菜'].includes('豆苗'));
+ assert.deepEqual(parseIngredients('豆苗、とうみょう トウミョウ'),['豆苗']);
+ const dishes=recipes.filter(r=>r.ingredients.some(([n])=>n==='豆苗'));
+ assert.equal(dishes.length,10);
+ assert.deepEqual(['主菜','副菜','汁物'].map(t=>dishes.filter(r=>r.type===t).length),[3,5,2]);
+ const result=analyzePlan(['豆苗'],1);
+ assert.ok(result.plan[0].every(r=>r.ingredients.some(([n])=>n==='豆苗')));
+ const pork=analyzePlan(['豆苗','豚バラ肉'],1);
+ assert.equal(pork.plan[0][0].name,'豚バラと豆苗の重ね蒸し');
 });
