@@ -13,11 +13,11 @@ test('表記揺れを統合し、肉の部位・魚種は別々に保持する',
  assert.notEqual(normalizeIngredient('鶏もも'),normalizeIngredient('鶏むね'));
  assert.equal(normalizeIngredient('ﾎｯｹ'),'ホッケ');
 });
-test('135件の重複しないレシピに必要な情報が揃っている',()=>{
- assert.equal(recipes.length,135);
- assert.equal(new Set(recipes.map(r=>r.name)).size,135);
- assert.equal(new Set(recipes.map(r=>r.id)).size,135);
- assert.equal(new Set(recipes.map(r=>r.steps.join('|'))).size,135);
+test('187件の重複しないレシピに必要な情報が揃っている',()=>{
+ assert.equal(recipes.length,187);
+ assert.equal(new Set(recipes.map(r=>r.name)).size,187);
+ assert.equal(new Set(recipes.map(r=>r.id)).size,187);
+ assert.equal(new Set(recipes.map(r=>r.steps.join('|'))).size,187);
  for(const r of recipes){
   assert.ok(['主菜','副菜','汁物'].includes(r.type),r.name);
   assert.ok(r.servings===2&&r.time>=10&&r.time<=60,r.name);
@@ -58,7 +58,7 @@ test('豆腐と卵を指定した主菜に未登録の肉魚を入れない',()=
  }
 });
 test('不明食材・対応料理なし・部位未指定の状態を正直に返す',()=>{
- for(const name of ['鹿肉','架空食材','鶏肉']){
+ for(const name of ['鹿肉','架空食材']){
   const result=analyzePlan([name],3);
   assert.ok(result.plan.every(([main])=>main===null));assert.equal(result.unsupported.length,1);
  }
@@ -95,4 +95,32 @@ test('豆苗は自由入力・一覧に対応し、主菜・副菜・汁物に10
  assert.ok(result.plan[0].every(r=>r.ingredients.some(([n])=>n==='豆苗')));
  const pork=analyzePlan(['豆苗','豚バラ肉'],1);
  assert.equal(pork.plan[0][0].name,'豚バラと豆苗の重ね蒸し');
+});
+
+test('一覧の全食材に最低2品あり、単独で登録しても献立内で活用される',()=>{
+ for(const name of Object.values(ingredientCatalog).flat()){
+  assert.ok(recipes.filter(r=>r.ingredients.some(([n])=>n===name)).length>=2,`${name}: 2品未満`);
+  const result=analyzePlan([name],1);
+  assert.deepEqual(result.unsupported,[],name);
+  assert.ok(result.used.includes(name),`${name}: 献立で使われない`);
+ }
+});
+test('うどんは主菜として表示され、指定した部位を勝手に推定しない',()=>{
+ const result=analyzePlan(['うどん'],3);
+ assert.ok(result.plan.every(([main])=>main.protein==='うどん'));
+ assert.ok(new Set(result.plan.map(([main])=>main.id)).size>=2);
+ for(const name of ['鶏肉','豚肉','牛肉']){
+  const normalized=normalizeIngredient(name);
+  const plan=analyzePlan([name],2).plan;
+  assert.ok(plan.every(([main])=>main.protein===normalized));
+  assert.ok(plan.every(([main])=>main.ingredients.some(([n,amount])=>n===normalized&&amount.includes('ひき肉を除く'))));
+ }
+});
+
+test('公開ページが全ての更新済みファイルを同じ更新番号で読み込む',()=>{
+ const fs=require('node:fs'),path=require('node:path'),{createHash}=require('node:crypto');
+ const root=path.join(__dirname,'..'),files=['style.css','ingredients.js','recipes.js','app.js'];
+ const hash=createHash('sha256');for(const f of files)hash.update(f).update('\0').update(fs.readFileSync(path.join(root,f)));
+ const version=hash.digest('hex').slice(0,12),html=fs.readFileSync(path.join(root,'index.html'),'utf8');
+ for(const f of files)assert.ok(html.includes(`${f}?v=${version}`),`${f}の更新番号が古い`);
 });

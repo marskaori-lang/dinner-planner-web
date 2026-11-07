@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>まいにちの食卓｜夕食献立プランナー</title>
-<link rel="stylesheet" href="style.css"><script src="ingredients.js" defer></script><script src="recipes.js" defer></script><script src="app.js" defer></script>
+<link rel="stylesheet" href="style.css?v=a6ceddcdfe19"><script src="ingredients.js?v=a6ceddcdfe19" defer></script><script src="recipes.js?v=a6ceddcdfe19" defer></script><script src="app.js?v=a6ceddcdfe19" defer></script>
 </head>
 <body>
 <header><a class="brand" href="./"><span class="mark">◒</span> まいにちの食卓</a><span class="header-note">おいしく、無理なく、バランスよく。</span></header>
@@ -12,7 +12,7 @@
 <div class="workspace"><aside><form id="planner" class="panel"><div class="section-number">01 <span>PLAN YOUR MEALS</span></div><h2>献立の条件をえらぶ</h2><label for="ingredients">食材を自由入力</label><p class="field-help" id="ingredient-help">読点・カンマ・スペース・改行で区切れます。例：鶏もも、ホッケ、にんじん</p><textarea id="ingredients" rows="2" maxlength="1000" aria-describedby="ingredient-help" placeholder="使いたい食材を入力"></textarea><button type="button" id="add-ingredients" class="secondary">＋ リストに追加</button>
 <details class="catalog"><summary>カテゴリ別の一覧から選ぶ</summary><p class="field-help">タップで追加・解除できます。部位が不明な肉は「部位未指定」を選んでください。</p><div id="ingredient-categories"></div></details>
 <div class="selected-heading"><strong>登録した食材 <span id="selected-count">0</span></strong><button type="button" id="clear-ingredients" class="text-button">すべて解除</button></div><div id="selected-ingredients" class="chips selected" aria-label="登録した食材"></div><p id="input-status" class="field-help" role="status" aria-live="polite"></p><label for="days">何日分つくりますか？</label><div class="days-field"><input type="range" id="days" min="1" max="7" value="3"><output id="day-count" for="days">3日分</output></div><div class="range-label"><span>1日</span><span>7日</span></div><button class="primary" type="submit">献立をつくる <span>→</span></button><p class="small-note">入力欄の食材も含めて献立を作ります。未登録ならおすすめを表示します。</p></form><div class="balance-note"><span>✳</span><div><strong>食卓に、ちいさなバランスを。</strong><p>肉・魚・大豆製品を取り入れて。焼く・煮る・蒸すなど、つくり方にも変化をつけます。</p></div></div></aside>
-<section class="results" aria-label="提案された献立"><div class="results-heading"><div><div class="section-number">02 <span>YOUR DINNER MENU</span></div><h2>これからの夕食</h2></div><span class="pill" id="menu-count">3日分の献立</span></div><div id="summary" class="summary" role="status" aria-live="polite"></div><div id="menus"></div><p class="nutrition-note">※ 栄養バランスは食材の種類をもとにした目安です。栄養計算・アレルギー対応は行っていません。食物アレルギーがある場合は、材料を必ずご確認ください。</p></section></div>
-</main><footer><span class="brand">◒ まいにちの食卓</span><span>毎日のごはんに、少しのゆとりを。</span></footer>
+<section class="results" aria-label="提案された献立"><div class="results-heading"><div><div class="section-number">02 <span>YOUR DINNER MENU</span></div><h2>これからの夕食</h2></div><span class="pill" id="menu-count">3日分の献立</span></div><div id="summary" class="summary" role="status" aria-live="polite"></div><details id="ingredient-recipes" class="related-recipes" hidden><summary>登録した食材のほかのレシピを見る</summary><p class="field-help">献立とは別の候補です。必要な追加食材をレシピで確認できます。</p><div id="ingredient-recipe-list"></div></details><div id="menus"></div><p class="nutrition-note">※ 栄養バランスは食材の種類をもとにした目安です。栄養計算・アレルギー対応は行っていません。食物アレルギーがある場合は、材料を必ずご確認ください。</p></section></div>
+</main><footer><span class="brand">◒ まいにちの食卓</span><span>毎日のごはんに、少しのゆとりを。<span id="app-version">レシピ187品</span></span></footer>
 <dialog id="recipe-dialog" aria-labelledby="recipe-title"><div class="dialog-top"><span class="eyebrow">RECIPE / <span id="recipe-servings">2人分</span></span><button id="close-dialog" class="close" aria-label="レシピを閉じる">×</button></div><div id="recipe-content"></div></dialog>
 </body></html>

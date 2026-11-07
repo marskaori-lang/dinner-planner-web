@@ -70,7 +70,7 @@ if(typeof document!=='undefined') {
   for(const item of selected){const b=document.createElement('button');b.type='button';b.textContent=`${item} ×`;b.setAttribute('aria-label',`${item}を解除`);b.onclick=()=>{selected=selected.filter(x=>x!==item);renderSelected();markDirty();};$('selected-ingredients').append(b);}
   for(const b of document.querySelectorAll('[data-ingredient]'))b.setAttribute('aria-pressed',String(selected.includes(b.dataset.ingredient)));
   const notes=[];
-  if(selected.some(x=>x.includes('部位未指定')))notes.push('部位未指定の肉は対応レシピを選べません。一覧から部位を選び直してください。');
+  if(selected.some(x=>x.includes('部位未指定')))notes.push('部位未指定の料理には、骨なし・薄切りなどの条件があります。材料欄を確認し、部位が分かる場合は一覧で選び直してください。');
   if(selected.some(x=>!known.has(x)))notes.push('一覧にない食材も登録できます。対応レシピがない場合は献立作成後にお知らせします。');
   $('input-status').textContent=notes.join(' ');
  }
@@ -99,6 +99,11 @@ if(typeof document!=='undefined') {
   if(result.repeated.length)notices.push('指定食材を優先するため、同じ料理が再登場します。');
   notices.push('不足食材は各料理に表示しています。調味料・分量はレシピで確認してください。主食がない献立にはごはんなどを添えてください。');
   $('summary').textContent=notices.join(' ');
+  $('ingredient-recipes').hidden=!result.input.length;
+  $('ingredient-recipe-list').innerHTML=result.input.map(name=>{
+   const choices=Planner.recipes.filter(r=>Planner.matches(r,name));
+   return `<details class="related-group"><summary>${escape(name)}を使う料理（${choices.length}品）</summary>${choices.length?choices.map(r=>`<button type="button" class="related-button" data-recipe-id="${r.id}">${escape(r.name)}<span>${r.type} · 約${r.time}分 →</span></button>`).join(''):'<p class="field-help">対応レシピがありません。</p>'}</details>`;
+  }).join('');
   $('menus').innerHTML=result.plan.map((meals,day)=>{
    const main=meals[0];
    return `<article class="menu-card"><div class="card-head"><span class="day-label">DAY <b>${String(day+1).padStart(2,'0')}</b></span><span class="theme">${main?`${escape(main.cuisine)} · ${escape(main.method)}`:'主菜の対応レシピなし'}</span></div>${meals.map((r,index)=>{
@@ -109,14 +114,15 @@ if(typeof document!=='undefined') {
   }).join('');
  }
  $('planner').onsubmit=e=>{e.preventDefault();addTyped();renderPlan();if(matchMedia('(max-width:760px)').matches)$('summary').scrollIntoView({behavior:'smooth',block:'start'});};
- $('menus').onclick=e=>{
-  const b=e.target.closest('[data-day]');if(!b)return;
-  const r=current.plan[Number(b.dataset.day)][Number(b.dataset.dish)];const missing=missingIngredients(r,current.input);
+ function openRecipe(r){
+  const missing=missingIngredients(r,current.input);
   const shortage=missing.food.length?missing.food.map(([n,a])=>`${n} ${a}`).join('、'):'なし';
   $('recipe-servings').textContent=`${r.servings}人分`;
   $('recipe-content').innerHTML=`<h2 id="recipe-title">${escape(r.name)}</h2><div class="dish-meta">${r.type} / ${r.cuisine} / ${r.method} / 約${r.time}分</div><p class="recipe-note">追加が必要な食材：${escape(shortage)}<br>未登録の調味料等：${escape(missing.pantry.map(([n])=>n).join('・')||'なし')}<br>登録は在庫量を保証しません。下の分量を確認してください。</p><h3>材料（${r.servings}人分）</h3><ul>${r.ingredients.map(([n,a])=>`<li>${escape(n)} … ${escape(a)} ${current.input.includes(n)?'<span class="pill">登録済み</span>':''}</li>`).join('')}</ul><h3>つくり方</h3><ol>${r.steps.map(s=>`<li>${escape(s)}</li>`).join('')}</ol><p class="recipe-note">調理時間は目安です。肉・魚・卵は十分に加熱してください。骨やアレルギーにもご注意ください。生の肉・魚を扱った器具は洗浄し、完成品と分けてください。</p>`;
   $('recipe-dialog').showModal();
- };
+ }
+ $('menus').onclick=e=>{const b=e.target.closest('[data-day]');if(b)openRecipe(current.plan[Number(b.dataset.day)][Number(b.dataset.dish)]);};
+ $('ingredient-recipe-list').onclick=e=>{const b=e.target.closest('[data-recipe-id]');if(b){const recipe=Planner.recipes.find(r=>r.id===b.dataset.recipeId);if(recipe)openRecipe(recipe);}};
  $('close-dialog').onclick=()=>$('recipe-dialog').close();
  $('recipe-dialog').onclick=e=>{if(e.target===$('recipe-dialog')){const b=e.target.getBoundingClientRect();if(e.clientX<b.left||e.clientX>b.right||e.clientY<b.top||e.clientY>b.bottom)e.target.close();}};
  renderSelected();renderPlan();
