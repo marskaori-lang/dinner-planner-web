@@ -13,11 +13,11 @@ test('表記揺れを統合し、肉の部位・魚種は別々に保持する',
  assert.notEqual(normalizeIngredient('鶏もも'),normalizeIngredient('鶏むね'));
  assert.equal(normalizeIngredient('ﾎｯｹ'),'ホッケ');
 });
-test('187件の重複しないレシピに必要な情報が揃っている',()=>{
- assert.equal(recipes.length,187);
- assert.equal(new Set(recipes.map(r=>r.name)).size,187);
- assert.equal(new Set(recipes.map(r=>r.id)).size,187);
- assert.equal(new Set(recipes.map(r=>r.steps.join('|'))).size,187);
+test('191件の重複しないレシピに必要な情報が揃っている',()=>{
+ assert.equal(recipes.length,191);
+ assert.equal(new Set(recipes.map(r=>r.name)).size,191);
+ assert.equal(new Set(recipes.map(r=>r.id)).size,191);
+ assert.equal(new Set(recipes.map(r=>r.steps.join('|'))).size,191);
  for(const r of recipes){
   assert.ok(['主菜','副菜','汁物'].includes(r.type),r.name);
   assert.ok(r.servings===2&&r.time>=10&&r.time<=60,r.name);
@@ -60,7 +60,8 @@ test('豆腐と卵を指定した主菜に未登録の肉魚を入れない',()=
 test('不明食材・対応料理なし・部位未指定の状態を正直に返す',()=>{
  for(const name of ['鹿肉','架空食材']){
   const result=analyzePlan([name],3);
-  assert.ok(result.plan.every(([main])=>main===null));assert.equal(result.unsupported.length,1);
+  assert.ok(result.plan.every(day=>day.every(Boolean)));assert.equal(result.unsupported.length,1);assert.equal(result.supplementedMainDays.length,3);
+  assert.ok(result.plan.flat().every(r=>r.ingredients.every(([n])=>!isAnimalIngredient(n))));
  }
  const result=analyzePlan(['鮭','未知食材'],1);
  assert.equal(result.plan[0][0].protein,'鮭');assert.deepEqual(result.unsupported,['未知食材']);
@@ -92,7 +93,8 @@ test('豆苗は自由入力・一覧に対応し、主菜・副菜・汁物に10
  assert.equal(dishes.length,10);
  assert.deepEqual(['主菜','副菜','汁物'].map(t=>dishes.filter(r=>r.type===t).length),[3,5,2]);
  const result=analyzePlan(['豆苗'],1);
- assert.ok(result.plan[0].every(r=>r.ingredients.some(([n])=>n==='豆苗')));
+ assert.ok(result.used.includes('豆苗'));
+ assert.ok(result.plan[0].every(Boolean));
  const pork=analyzePlan(['豆苗','豚バラ肉'],1);
  assert.equal(pork.plan[0][0].name,'豚バラと豆苗の重ね蒸し');
 });
@@ -123,4 +125,41 @@ test('公開ページが全ての更新済みファイルを同じ更新番号�
  const hash=createHash('sha256');for(const f of files)hash.update(f).update('\0').update(fs.readFileSync(path.join(root,f)));
  const version=hash.digest('hex').slice(0,12),html=fs.readFileSync(path.join(root,'index.html'),'utf8');
  for(const f of files)assert.ok(html.includes(`${f}?v=${version}`),`${f}の更新番号が古い`);
+});
+
+test('全一覧食材の単独・ヨーグルトとの2食材でも毎日3品をそろえる',()=>{
+ for(const name of Object.values(ingredientCatalog).flat())for(const input of [[name],[name,'ヨーグルト']]){
+  const result=analyzePlan(input,3);
+  for(const day of result.plan)assert.deepEqual(day.map(r=>r?.type),['主菜','副菜','汁物'],input.join('・'));
+ }
+ const yogurt=analyzePlan(['ヨーグルト'],1);
+ assert.ok(yogurt.used.includes('ヨーグルト'));
+ assert.deepEqual(yogurt.supplementedMainDays,[1]);
+ const main=yogurt.plan[0][0];
+ assert.ok(main.ingredients.some(([n])=>['卵','豆腐','厚揚げ','大豆水煮'].includes(n)));
+ assert.ok(missingIngredients(main,['ヨーグルト']).food.length>0);
+});
+test('主食は他の肉魚や卵を登録しても優先し、複数の主食は日ごとに順番に使う',()=>{
+ const staples=['うどん','パスタ','米','そば','中華麺'];
+ for(const staple of staples)for(const protein of ['鶏もも肉','ホッケ','卵','豆腐']){
+  const result=analyzePlan([staple,protein,'キャベツ','にんじん','玉ねぎ'],1);
+  assert.ok(result.plan[0][0].ingredients.some(([n])=>n===staple),`${staple}・${protein}`);
+  assert.ok(result.plan.flat().every(r=>r.ingredients.every(([n])=>!isAnimalIngredient(n)||n===protein)));
+ }
+ const result=analyzePlan(['うどん','パスタ','卵','鶏もも肉','キャベツ'],4);
+ assert.deepEqual(result.plan.map(([main])=>main.ingredients.some(([n])=>n==='うどん')?'うどん':'パスタ'),['うどん','パスタ','うどん','パスタ']);
+ assert.deepEqual(result.unusedStaples,[]);
+ const short=analyzePlan(['うどん','パスタ'],1);
+ assert.deepEqual(short.unusedStaples,['パスタ']);
+});
+test('麺中心の献立でもたんぱく源と野菜を組み合わせる',()=>{
+ const proteins=new Set(['卵','豆腐','厚揚げ','高野豆腐','大豆水煮','ひよこ豆水煮','納豆']);
+ const veg=new Set(ingredientCatalog['野菜']);
+ for(const staple of ['うどん','パスタ','そば','中華麺']){
+  const plan=analyzePlan([staple,'ホッケ'],3).plan;
+  for(const day of plan){
+   assert.ok(day.some(r=>r.ingredients.some(([n])=>proteins.has(n))),staple+'：たんぱく源なし');
+   assert.ok(day.some(r=>r.ingredients.some(([n])=>veg.has(n))),staple+'：野菜なし');
+  }
+ }
 });

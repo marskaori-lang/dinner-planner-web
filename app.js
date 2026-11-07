@@ -16,14 +16,19 @@ const Planner = (() => {
   const requestedAnimals=input.filter(isAnimalIngredient);
   const usable=input.filter(name=>recipeList.some(r=>matches(r,name)));
   const unsupported=input.filter(name=>!usable.includes(name));
-  // 肉・魚等の指定があれば、主材料の完全一致を必須にする。別の部位や魚種は代用しない。
-  let mains=recipeList.filter(r=>r.type==='主菜');
-  if(requestedProteins.length) {
-   mains=mains.filter(r=>requestedProteins.includes(r.protein));
-   mains=mains.filter(r=>r.ingredients.every(([name])=>!isAnimalIngredient(name)||requestedAnimals.includes(name)));
-  } else if(input.length) mains=mains.filter(r=>input.some(name=>matches(r,name)));
-  const eligibleOther=recipeList.filter(r=>r.type!=='主菜'&&(!requestedProteins.length||r.ingredients.every(([name])=>!isAnimalIngredient(name)||requestedAnimals.includes(name))));
-  const counts=new Map(),usedInput=new Set(),methods=new Map(),centers=new Map();
+  const stapleNames=new Set(['米','うどん','そば','中華麺','パスタ']);
+  const selectedStaples=input.filter(name=>stapleNames.has(name));
+  const vegetables=new Set([...ingredientCatalog['野菜'],...ingredientCatalog['きのこ']].filter(n=>!['にんにく','しょうが','大葉'].includes(n)));
+  const hasProtein=r=>r.ingredients.some(([name])=>proteinIngredients.has(name));
+  // 指定があるときは別の肉・魚を主材料として買い足さない。卵・豆製品等で補える候補は残す。
+  const allowed=r=>!requestedProteins.length||r.ingredients.every(([name])=>!isAnimalIngredient(name)||requestedAnimals.includes(name));
+  const safeMains=recipeList.filter(r=>r.type==='主菜'&&allowed(r));
+  const exactMains=safeMains.filter(r=>requestedProteins.includes(r.protein));
+  const matchedMains=safeMains.filter(r=>input.some(name=>matches(r,name)));
+  const fallbackMains=safeMains.filter(r=>!r.ingredients.some(([name])=>isAnimalIngredient(name)));
+  const eligibleOther=recipeList.filter(r=>r.type!=='主菜'&&allowed(r));
+  const counts=new Map(),usedInput=new Set(),methods=new Map(),centers=new Map(),stapleUses=new Map();
+  const supplementedMainDays=[];
   let previous=null;
   function choose(candidates,today){
    if(!candidates.length)return null;
@@ -33,7 +38,11 @@ const Planner = (() => {
     const shortage=missingIngredients(r,input).food.length;
     const overlap=today.filter(Boolean).reduce((total,other)=>total+r.ingredients.filter(([name])=>!pantryIngredients.has(name)&&other.ingredients.some(([n])=>name===n)).length,0);
     // 最初に指定食材を使い、次に重複と作り方の偏りを抑える。候補の制限は採点と別に守る。
-    const score=fresh*70+matched.length*12-(counts.get(r.id)||0)*45-shortage*3-overlap*3
+    const todayHasProtein=today.filter(Boolean).some(hasProtein);
+    const seenVegetables=new Set(today.filter(Boolean).flatMap(other=>other.ingredients.map(([n])=>n).filter(n=>vegetables.has(n))));
+    const newVegetables=r.ingredients.filter(([n])=>vegetables.has(n)&&!seenVegetables.has(n)).length;
+    const balance=(!todayHasProtein&&hasProtein(r)?24:0)+Math.min(newVegetables,3)*3;
+    const score=balance+fresh*70+matched.length*12-(counts.get(r.id)||0)*45-shortage*3-overlap*3
       -(r.type==='主菜'?(methods.get(r.method)||0)*7+(centers.get(r.protein)||0)*5+(previous?.method===r.method?10:0)+(previous?.protein===r.protein?8:0):0)-index*.001;
     return {r,score};
    }).sort((a,b)=>b.score-a.score);
@@ -43,15 +52,27 @@ const Planner = (() => {
   }
   const plan=[];
   for(let day=0;day<days;day++) {
-   const main=choose(mains,[]);
-   // 入力した食材に全く対応できないときは、関係のない献立を作って成功扱いにしない。
-   const others=input.length&&!usable.length?[]:eligibleOther;
-   const side=choose(others.filter(r=>r.type==='副菜'),[main]);
-   const soup=choose(others.filter(r=>r.type==='汁物'),[main,side]);
+   let candidates;
+   if(selectedStaples.length){
+    // 使用回数が少ない主食から順番に使う。副菜などでの使用済み判定とは別に数える。
+    const staple=[...selectedStaples].sort((a,b)=>(stapleUses.get(a)||0)-(stapleUses.get(b)||0))[0];
+    candidates=safeMains.filter(r=>matches(r,staple));
+    if(candidates.length)stapleUses.set(staple,(stapleUses.get(staple)||0)+1);
+   }
+   if(!candidates?.length)candidates=exactMains.length?exactMains:matchedMains.length?matchedMains:fallbackMains;
+   const main=choose(candidates,[]);
+   if(input.length&&main&&!input.some(name=>matches(main,name)))supplementedMainDays.push(day+1);
+   let sideCandidates=eligibleOther.filter(r=>r.type==='副菜');
+   if(main&&!hasProtein(main)){
+    const proteinSides=sideCandidates.filter(hasProtein);
+    if(proteinSides.length)sideCandidates=proteinSides;
+   }
+   const side=choose(sideCandidates,[main]);
+   const soup=choose(eligibleOther.filter(r=>r.type==='汁物'),[main,side]);
    plan.push([main,side,soup]);
    if(main){methods.set(main.method,(methods.get(main.method)||0)+1);centers.set(main.protein,(centers.get(main.protein)||0)+1);previous=main;}
   }
-  return {plan,input,unsupported,used:input.filter(x=>usedInput.has(x)),unused:input.filter(x=>!usedInput.has(x)),unmatchedProteins:requestedProteins.filter(x=>!mains.some(r=>r.protein===x)),repeated:[...counts].filter(([,n])=>n>1).map(([id])=>recipeList.find(r=>r.id===id).name)};
+  return {plan,input,unsupported,used:input.filter(x=>usedInput.has(x)),unused:input.filter(x=>!usedInput.has(x)),supplementedMainDays,selectedStaples,unusedStaples:selectedStaples.filter(n=>!stapleUses.has(n)),unmatchedProteins:requestedProteins.filter(x=>!exactMains.some(r=>r.protein===x)),repeated:[...counts].filter(([,n])=>n>1).map(([id])=>recipeList.find(r=>r.id===id).name)};
  }
  function createPlan(input,days){return analyzePlan(input,days).plan;}
  return {recipes:recipeList,ingredientCatalog,normalizeIngredient,parseIngredients,matches,missingIngredients,analyzePlan,createPlan,known};
@@ -93,7 +114,10 @@ if(typeof document!=='undefined') {
   if(!result.input.length)notices.push(`登録なしのおすすめ献立です。${Planner.recipes.length}種類の家庭料理から選びました。`);
   if(result.used.length)notices.push(`活用した食材：${result.used.join('・')}。`);
   if(result.unsupported.length)notices.push(`対応レシピなし：${result.unsupported.join('・')}。別の肉や魚には置き換えていません。`);
-  if(result.unmatchedProteins.length)notices.push(`指定した主材料の主菜を提案できません：${result.unmatchedProteins.join('・')}。部位未指定の場合は部位を選び直してください。`);
+  if(result.unmatchedProteins.length)notices.push(`指定食材を中心とした主菜は未対応です：${result.unmatchedProteins.join('・')}。別の肉・魚には置き換えず、追加食材で3品を補っています。`);
+  if(result.selectedStaples.length)notices.push(`選んだ主食を優先しました：${result.selectedStaples.filter(n=>!result.unusedStaples.includes(n)).join('・')}。`);
+  if(result.unusedStaples.length)notices.push(`日数に収まらなかった主食：${result.unusedStaples.join('・')}。日数を増やすと順に提案します。`);
+  if(result.supplementedMainDays.length)notices.push(`${result.supplementedMainDays.join('・')}日目の主菜は、追加購入する食材で補っています。入力食材は副菜・汁物でも活用します。`);
   const notUsed=result.unused.filter(x=>!result.unsupported.includes(x));
   if(notUsed.length)notices.push(`今回は使わなかった食材：${notUsed.join('・')}。`);
   if(result.repeated.length)notices.push('指定食材を優先するため、同じ料理が再登場します。');
@@ -109,7 +133,7 @@ if(typeof document!=='undefined') {
    return `<article class="menu-card"><div class="card-head"><span class="day-label">DAY <b>${String(day+1).padStart(2,'0')}</b></span><span class="theme">${main?`${escape(main.cuisine)} · ${escape(main.method)}`:'主菜の対応レシピなし'}</span></div>${meals.map((r,index)=>{
     if(!r)return `<div class="empty-dish">${['主菜','副菜','汁物'][index]}：対応するレシピを提案できません。食材を追加・変更してください。</div>`;
     const missing=missingIngredients(r,result.input);const used=result.input.filter(x=>Planner.matches(r,x));
-    return `<div class="dish"><div class="dish-icon" aria-hidden="true">${r.icon}</div><div class="dish-info"><div><span class="dish-label">${r.type}</span><span class="method">${r.method} / ${r.cuisine}</span></div><h3>${escape(r.name)}</h3><div class="dish-meta">約${r.time}分 · ${r.servings}人分${used.length?` · 登録食材：${escape(used.join('・'))}`:''}</div><div class="missing">${missing.food.length?`追加が必要：${escape(missing.food.map(([n])=>n).join('・'))}`:'追加の食材なし（調味料を除く）'}</div></div><button class="recipe-button" data-day="${day}" data-dish="${index}" aria-label="${escape(r.name)}のレシピを見る">レシピ <span aria-hidden="true">↗</span></button></div>`;
+    return `<div class="dish"><div class="dish-icon" aria-hidden="true">${r.icon}</div><div class="dish-info"><div><span class="dish-label">${r.type}</span><span class="method">${r.method} / ${r.cuisine}</span></div><h3>${escape(r.name)}</h3>${index===0&&result.supplementedMainDays.includes(day+1)?'<div class="missing">追加食材で補った主菜</div>':''}<div class="dish-meta">約${r.time}分 · ${r.servings}人分${used.length?` · 登録食材：${escape(used.join('・'))}`:''}</div><div class="missing">${missing.food.length?`追加が必要：${escape(missing.food.map(([n])=>n).join('・'))}`:'追加の食材なし（調味料を除く）'}</div></div><button class="recipe-button" data-day="${day}" data-dish="${index}" aria-label="${escape(r.name)}のレシピを見る">レシピ <span aria-hidden="true">↗</span></button></div>`;
    }).join('')}</article>`;
   }).join('');
  }
